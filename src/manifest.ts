@@ -13,4 +13,13 @@ export default defineManifest({
         service_worker: 'src/background.ts',
         type: 'module'
     },
+    commands: {
+        'open-side-panel': {
+            suggested_key: {
+                default: 'Ctrl+K',
+                mac: 'Command+K'
+            },
+            description: 'Open the side panel'
+        }
+    }
 });

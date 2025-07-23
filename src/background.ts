@@ -14,3 +14,17 @@ chrome.runtime.onInstalled.addListener(async () => {
     // Enable side panel on toolbar click
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 });
+
+chrome.commands.onCommand.addListener((command) => {
+    if (command === 'open-side-panel') {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const tabId = tabs[0]?.id;
+            if (tabId) {
+              console.log("Opening side panel on tab:", tabId);
+              chrome.sidePanel.open({ tabId });
+            } else {
+              console.warn("No active tab found");
+            }
+          });
+    }
+});
