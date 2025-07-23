@@ -19,9 +19,11 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* Type Definitions */
+    "types": ["chrome", "vite/client"]
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }
