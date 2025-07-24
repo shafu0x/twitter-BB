@@ -23,7 +23,13 @@
     "noUncheckedSideEffectImports": true,
 
     /* Type Definitions */
-    "types": ["chrome", "vite/client"]
+    "types": ["chrome", "vite/client"],
+
+    /* Path mapping */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }
