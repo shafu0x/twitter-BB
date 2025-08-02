@@ -47,6 +47,64 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
 
 
     const signIn = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            // Authentication is handled by the backkground script
+            await new Promise<void>((resolve, reject) => {
+                chrome.runtime.sendMessage({action: 'AUTHENTICATE'}, (response) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                        return;
+                    }
+                    if (response?.success) {
+                        resolve();
+                    } else {
+                        reject(new Error(response?.error || 'Authentication failed'));
+                    }
+                });
+            });
+
+            const pollAuth = async (attempts = 0): Promise<void> => {
+                // 1 minute authentication timeout
+                if (attempts > 60) {
+                    throw new Error('Authentication timed out');
+                }
+
+                const response = await new Promise<{ isAuthenticated: boolean }>((resolve) => {
+                    chrome.runtime.sendMessage({ action: 'IS_AUTHENTICATED'}, (response) => {
+                        resolve(response || { isAuthenticated: false });
+                    });
+                });
+
+                if (response.isAuthenticated) {
+                    const data = await chrome.storage.local.get(['echo_access_token']);
+                    if (data.echo_access_token) {
+                        setToken(data.echo_access_token);
+                        setIsAuthenticated(true);
+                        return;
+                    }
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return pollAuth(attempts + 1);
+            };
+
+            await pollAuth();
+
+
+            // Authentication is 
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An unknown error occurred');
+            setIsLoading(false);
+            setIsAuthenticated(false);
+            setToken(null);
+            setUser(null);
+            setBalance(null);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const signOut = async () => {
