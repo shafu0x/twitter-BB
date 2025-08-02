@@ -5,7 +5,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen">
-    <div className="flex h-0 flex-1 flex-col overflow-hidden bg-blue-500">
+    <div className="flex h-0 flex-1 flex-col overflow-hidden">
       <Chat />
     </div>
   </div>
