@@ -1,15 +1,14 @@
 import './App.css'
-import { Button } from '@/components/ui/button'
+import { Chat } from '@/components/chat'
 
 function App() {
 
   return (
-    <div>
-      <div>
-        <h1>Hello World</h1>
-        <Button variant="destructive" size="lg">Click me</Button>
-      </div>
+    <div className="flex flex-col h-screen w-screen">
+    <div className="flex h-0 flex-1 flex-col overflow-hidden bg-blue-500">
+      <Chat />
     </div>
+  </div>
   )
 }
 
