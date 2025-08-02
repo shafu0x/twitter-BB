@@ -15,6 +15,9 @@ export const authenticate = async (message: { params: { echoClientId: string; ec
         `&code_challenge=${codeChallenge}&code_challenge_method=S256` +
         `&state=${crypto.randomUUID()}`;
 
+    console.log('redirectUrl:', redirectUrl);
+    console.log('authUrl:', authUrl);
+
     chrome.identity.launchWebAuthFlow({
         url: authUrl,
         interactive: true,

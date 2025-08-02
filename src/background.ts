@@ -55,6 +55,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 sendResponse({ user: result.echo_user || null });
             });
             break;
+        case 'GET_TOKEN':
+            chrome.storage.local.get(['echo_access_token'], (result) => {
+                sendResponse({ token: result.echo_access_token || null });
+            });
+            break;
+        case 'CHECK_AUTH':
+            chrome.storage.local.get([
+                'echo_user',
+                'echo_access_token',
+                'echo_access_token_expires_at'
+            ], (result) => {
+                const now = Date.now();
+                const isAuthenticated = result.echo_user && 
+                    result.echo_access_token && 
+                    result.echo_access_token_expires_at &&
+                    now < result.echo_access_token_expires_at;
+                
+                sendResponse({ 
+                    isAuthenticated,
+                    user: isAuthenticated ? result.echo_user : null 
+                });
+            });
+            break;
         case 'SIGN_OUT':
             chrome.storage.local.remove([
                 'echo_user',

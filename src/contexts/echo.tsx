@@ -38,6 +38,14 @@ interface EchoContextValue {
 
 const EchoContext = React.createContext<EchoContextValue | null>(null);
 
+export const useEcho = () => {
+    const context = React.useContext(EchoContext);
+    if (!context) {
+        throw new Error('useEcho must be used within an EchoProvider');
+    }
+    return context;
+};
+
 
 interface EchoProviderProps {
     children: React.ReactNode,
@@ -57,83 +65,30 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
     React.useEffect(() => {
         const checkAuthState = async () => {
             try {
-                const authData = await chrome.storage.local.get([
-                    'echo_user',
-                    'echo_access_token',
-                    'echo_refresh_token',
-                    'echo_access_token_expires_at',
-                    'echo_refresh_token_expires_at'
-                ]);
-                
-                // Check if we have all required auth data
-                if (!authData.echo_user || !authData.echo_access_token || !authData.echo_access_token_expires_at) {
-                    // Clear any partial auth data
-                    await chrome.storage.local.remove([
-                        'echo_user',
-                        'echo_access_token',
-                        'echo_refresh_token',
-                        'echo_access_token_expires_at',
-                        'echo_refresh_token_expires_at'
-                    ]);
-                    setIsAuthenticated(false);
-                    setUser(null);
-                    setToken(null);
-                    setBalance(null);
-                    return;
-                }
-
-                // Check if access token is expired
-                const now = Date.now();
-                const accessTokenExpiresAt = authData.echo_access_token_expires_at;
-                
-                if (now >= accessTokenExpiresAt) {
-                    // Access token is expired, check if refresh token is still valid
-                    if (authData.echo_refresh_token && authData.echo_refresh_token_expires_at) {
-                        const refreshTokenExpiresAt = authData.echo_refresh_token_expires_at;
-                        
-                        if (now < refreshTokenExpiresAt) {
-                            // Refresh token is still valid, we can try to refresh the access token
-                            // For now, we'll clear the expired access token and require re-authentication
-                            await chrome.storage.local.remove(['echo_access_token', 'echo_access_token_expires_at']);
-                            setIsAuthenticated(false);
-                            setUser(null);
-                            setToken(null);
-                            setBalance(null);
+                // Check authentication status from background script
+                const response = await new Promise<{ isAuthenticated: boolean; user: EchoUser | null }>((resolve, reject) => {
+                    chrome.runtime.sendMessage({action: 'CHECK_AUTH'}, (response) => {
+                        if (chrome.runtime.lastError) {
+                            reject(new Error(chrome.runtime.lastError.message));
                             return;
                         }
-                    }
-                    
-                    // Both tokens are expired, clear all auth data
-                    await chrome.storage.local.remove([
-                        'echo_user',
-                        'echo_access_token',
-                        'echo_refresh_token',
-                        'echo_access_token_expires_at',
-                        'echo_refresh_token_expires_at'
-                    ]);
+                        resolve(response);
+                    });
+                });
+
+                if (response.isAuthenticated && response.user) {
+                    setUser(response.user);
+                    setIsAuthenticated(true);
+                    setError(null);
+                } else {
                     setIsAuthenticated(false);
                     setUser(null);
                     setToken(null);
                     setBalance(null);
-                    return;
                 }
-
-                // All checks passed, user is authenticated with valid tokens
-                setUser(authData.echo_user);
-                setIsAuthenticated(true);
-                setToken(authData.echo_access_token);
-                setError(null);
                 
             } catch (error) {
                 console.error('Error checking auth state:', error);
-                // On error, clear auth state to be safe
-                await chrome.storage.local.remove([
-                    'echo_user',
-                    'echo_access_token',
-                    'echo_refresh_token',
-                    'echo_access_token_expires_at',
-                    'echo_refresh_token_expires_at'
-                ]);
                 setIsAuthenticated(false);
                 setUser(null);
                 setToken(null);
@@ -154,7 +109,7 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
 
             // Authentication is handled by the background script
             const response = await new Promise<{ success: boolean; echoUser?: EchoUser; error?: string }>((resolve, reject) => {
-                chrome.runtime.sendMessage({action: 'AUTHENTICATE'}, (response) => {
+                chrome.runtime.sendMessage({action: 'AUTHENTICATE', params: { echoClientId: 'cc741099-df7c-47ed-8c95-3a8a61ab1217', echoBaseUrl: 'https://echo.merit.systems' }}, (response) => {
                     if (chrome.runtime.lastError) {
                         reject(new Error(chrome.runtime.lastError.message));
                         return;
@@ -225,8 +180,16 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
 
     const getToken = async (): Promise<string | null> => {
         try {
-            const tokenData = await chrome.storage.local.get(['echo_access_token']);
-            return tokenData.echo_access_token || null;
+            const response = await new Promise<{ token: string | null }>((resolve, reject) => {
+                chrome.runtime.sendMessage({action: 'GET_TOKEN'}, (response) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                        return;
+                    }
+                    resolve(response);
+                });
+            });
+            return response.token;
         } catch (error) {
             console.error('Error getting token:', error);
             return null;
