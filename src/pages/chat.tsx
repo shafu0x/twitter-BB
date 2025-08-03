@@ -76,7 +76,7 @@ export const Chat: React.FC = () => {
 
   if (!isReady) {
     return (
-      <div className="relative flex min-h-0 w-full flex-col">
+      <div className="relative flex min-h-0 w-full flex-col h-full">
         <div className="flex-1 flex items-center justify-center">
           <div className="w-full h-full p-4">
             <div className="min-h-[100px] min-w-[200px] bg-gray-700 rounded-lg p-4">
@@ -91,9 +91,9 @@ export const Chat: React.FC = () => {
   }
 
   return (
-    <div className="relative flex min-h-0 w-full flex-col">
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="relative flex min-h-0 w-full flex-col h-full">
+      {/* Messages Area - Fixed at top, scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-gray-400">
@@ -138,22 +138,32 @@ export const Chat: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-gray-700 p-4">
+      {/* Input Area - Fixed at bottom, can grow */}
+      <div className="border-t border-gray-700 p-4 flex-shrink-0">
         <div className="flex space-x-2">
-          <input
-            type="text"
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
-            className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none min-h-[40px] max-h-[120px] overflow-y-auto"
             disabled={!isReady || isGenerating}
+            rows={1}
+            style={{
+              minHeight: '40px',
+              maxHeight: '120px',
+              height: 'auto',
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = 'auto';
+              target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+            }}
           />
           <button
             onClick={handleSendMessage}
             disabled={!input.trim() || !isReady || isGenerating}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 self-end"
           >
             Send
           </button>

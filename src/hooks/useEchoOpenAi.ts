@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { useEcho } from '@/contexts/echo';
+import { useEcho } from '@/hooks/useEcho';
 
 // Type-only import to avoid runtime dependency
 type OpenAI = import('openai').OpenAI;

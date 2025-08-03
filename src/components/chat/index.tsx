@@ -1,4 +1,4 @@
-import { useEcho } from '@/contexts/echo';
+import { useEcho } from '@/hooks/useEcho';
 
 import { Chat } from '@/pages/chat';
 import { WelcomePage } from '@/pages/welcome';

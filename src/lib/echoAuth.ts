@@ -1,4 +1,4 @@
-import type { EchoUser, AuthenticateUserResponse } from "@/contexts/echo";
+import type { EchoUser, AuthenticateUserResponse } from "@/types/echo";
 
 export const authenticate = async (message: { params: { echoClientId: string; echoBaseUrl: string } }, sendResponse: (response: { success: boolean; error?: string, echoUser?: EchoUser, tokenData?: AuthenticateUserResponse }) => void) => {
     const redirectUrl = chrome.identity.getRedirectURL();

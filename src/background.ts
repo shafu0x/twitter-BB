@@ -74,7 +74,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 
                 sendResponse({ 
                     isAuthenticated,
-                    user: isAuthenticated ? result.echo_user : null 
+                    user: isAuthenticated ? result.echo_user : null,
+                    token: isAuthenticated ? result.echo_access_token : null
                 });
             });
             break;

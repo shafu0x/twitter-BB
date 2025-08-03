@@ -1,4 +1,4 @@
-import { useEcho } from '@/contexts/echo';
+import { useEcho } from '@/hooks/useEcho';
 import { cn } from '@/lib/utils';
 import { CmdkLogo } from './cmdk-logo';
 import { EchoSignin } from '@/components/ui/echo-sign-in';

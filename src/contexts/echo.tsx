@@ -1,57 +1,27 @@
-import React, { useState } from 'react'
-
-interface EchoBalance {
-    credits: number;
-    currency: string;
-}
-
-export declare interface EchoUser {
-    id: string;
-    email: string;
-    name?: string;
-    picture?: string;
-}
-
-export interface AuthenticateUserResponse {
-    user: EchoUser;
-    accessToken: string;
-    accessTokenExpiresAt: number;
-    refreshToken: string;
-    refreshTokenExpiresAt: number;
-}
-
-
-interface EchoContextValue {
-    user: EchoUser | null;
-    balance: EchoBalance | null;
-    isAuthenticated: boolean;
-    isLoading: boolean;
-    error: string | null;
-    token: string | null;
-    signIn: () => Promise<void>;
-    signOut: () => Promise<void>;
-    refreshBalance: () => Promise<void>;
-    createPaymentLink: (amount: number, description: string, successUrl?: string) => Promise<string>;
-    getToken: () => Promise<string | null>;
-    clearAuth: () => Promise<void>;
-}
-
-const EchoContext = React.createContext<EchoContextValue | null>(null);
-
-export const useEcho = () => {
-    const context = React.useContext(EchoContext);
-    if (!context) {
-        throw new Error('useEcho must be used within an EchoProvider');
-    }
-    return context;
-};
-
+import React, { useState, useEffect } from 'react'
+import { EchoContext, type EchoContextValue } from '@/hooks/useEcho';
+import type { EchoUser, EchoBalance } from '@/types/echo';
 
 interface EchoProviderProps {
     children: React.ReactNode,
 }
 
-
+// Helper function to check if user is authenticated
+const checkAuthStatus = async (): Promise<{ isAuthenticated: boolean; user: EchoUser | null; token: string | null }> => {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({action: 'CHECK_AUTH'}, (response) => {
+            if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+            }
+            resolve({
+                isAuthenticated: response.isAuthenticated,
+                user: response.user,
+                token: response.token || null
+            });
+        });
+    });
+};
 
 export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
     const [user, setUser] = useState<EchoUser | null>(null);
@@ -61,46 +31,47 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
     const [error, setError] = useState<string | null>(null);
     const [token, setToken] = useState<string | null>(null);
 
-    // Check initial authentication state on mount
-    React.useEffect(() => {
-        const checkAuthState = async () => {
-            try {
-                // Check authentication status from background script
-                const response = await new Promise<{ isAuthenticated: boolean; user: EchoUser | null }>((resolve, reject) => {
-                    chrome.runtime.sendMessage({action: 'CHECK_AUTH'}, (response) => {
-                        if (chrome.runtime.lastError) {
-                            reject(new Error(chrome.runtime.lastError.message));
-                            return;
-                        }
-                        resolve(response);
-                    });
-                });
+    // Function to update auth state
+    const updateAuthState = async () => {
+        try {
+            const authStatus = await checkAuthStatus();
+            setIsAuthenticated(authStatus.isAuthenticated);
+            setUser(authStatus.user);
+            setToken(authStatus.token);
+            setError(null);
+        } catch (error) {
+            console.error('Error updating auth state:', error);
+            setIsAuthenticated(false);
+            setUser(null);
+            setToken(null);
+            setBalance(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-                if (response.isAuthenticated && response.user) {
-                    setUser(response.user);
-                    setIsAuthenticated(true);
-                    setError(null);
-                } else {
-                    setIsAuthenticated(false);
-                    setUser(null);
-                    setToken(null);
-                    setBalance(null);
-                }
-                
-            } catch (error) {
-                console.error('Error checking auth state:', error);
-                setIsAuthenticated(false);
-                setUser(null);
-                setToken(null);
-                setBalance(null);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        
-        checkAuthState();
+    // Check initial authentication state on mount
+    useEffect(() => {
+        updateAuthState();
     }, []);
 
+    // Listen for storage changes to update auth state
+    useEffect(() => {
+        const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+            const authKeys = ['echo_user', 'echo_access_token', 'echo_access_token_expires_at'];
+            const hasAuthChanges = authKeys.some(key => changes[key]);
+            
+            if (hasAuthChanges) {
+                updateAuthState();
+            }
+        };
+
+        chrome.storage.onChanged.addListener(handleStorageChange);
+        
+        return () => {
+            chrome.storage.onChanged.removeListener(handleStorageChange);
+        };
+    }, []);
 
     const signIn = async () => {
         try {
@@ -119,16 +90,8 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
             });
 
             if (response.success && response.echoUser) {
-                // Set authentication state
-                setUser(response.echoUser);
-                setIsAuthenticated(true);
-                setError(null);
-                
-                // Get token from storage
-                const tokenData = await chrome.storage.local.get(['echo_access_token']);
-                if (tokenData.echo_access_token) {
-                    setToken(tokenData.echo_access_token);
-                }
+                // Update auth state after successful authentication
+                await updateAuthState();
             } else {
                 throw new Error(response.error || 'Authentication failed');
             }
@@ -158,12 +121,8 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
                 });
             });
             
-            // Clear local state
-            setUser(null);
-            setIsAuthenticated(false);
-            setToken(null);
-            setBalance(null);
-            setError(null);
+            // Update auth state after sign out
+            await updateAuthState();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Sign out failed');
         } finally {
@@ -172,9 +131,12 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
     };
 
     const refreshBalance = async () => {
+        // TODO: Implement balance refresh
     };
 
-    const createPaymentLink = async (_amount: number, _description: string, _successUrl?: string): Promise<string> => {
+    const createPaymentLink = async (amount: number, description: string, successUrl?: string): Promise<string> => {
+        // TODO: Implement payment link creation
+        console.log('Creating payment link:', { amount, description, successUrl });
         return '';
     };
 
@@ -197,6 +159,7 @@ export const EchoProvider: React.FC<EchoProviderProps> = ({ children }) => {
     };
 
     const clearAuth = async (): Promise<void> => {
+        // TODO: Implement clear auth
     };
 
     const contextValue: EchoContextValue = {

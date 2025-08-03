@@ -1,4 +1,4 @@
-import { useEcho } from '@/contexts/echo';
+import { useEcho } from '@/hooks/useEcho';
 import { Button } from '@/components/ui/button';
 import React, { useState } from 'react';
 import { MeritLogo } from './merit-logo';
