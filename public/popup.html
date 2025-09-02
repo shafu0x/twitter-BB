@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tweet Human Checker</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      body { font: 14px/1.4 -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif; padding: 12px; }
+      button { padding: 6px 10px; font-weight: 600; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+  </head>
+  <body>
+    <h3>Tweet Human Checker</h3>
+    <div id="auth-status">Checking auth…</div>
+    <div class="row" style="margin-top: 8px;">
+      <button id="sign-in">Sign in to Echo</button>
+      <button id="sign-out">Sign out</button>
+    </div>
+    <div style="margin-top: 12px;">
+      <div>Balance: <span id="balance">—</span></div>
+      <div class="mono" id="user">—</div>
+    </div>
+    <script type="module" src="../src/popup.ts"></script>
+  </body>
+  </html>
+
+
