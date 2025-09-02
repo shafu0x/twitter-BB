@@ -148,12 +148,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     });
 
                     const t = text.trim();
+                    const hasEmojis = (() => {
+                        try { return /\p{Extended_Pictographic}/u.test(t); } catch { return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(t); }
+                    })();
                     const hints = {
                         isReply: false,
                         hasLink: /https?:\/\/\S+/i.test(t) || t.includes('http'),
                         hasHashtags: /(^|\s)#\w+/.test(t),
                         hasMentions: /(^|\s)@\w+/.test(t),
                         length: t.length,
+                        hasEmojis,
                         likesCount: typeof likes === 'number' ? likes : 0,
                     };
 
@@ -174,6 +178,7 @@ Strict guidance
 - Very short text without concrete detail should have low confidence and usually a low humanProbability.
 - Human signals: concrete first-person details, specific times/places/numbers, mild typos, varied punctuation, context-dependent humor or nuance, code-switching/slang that fits content.
 - Bot signals: templated praise or agreement, recycled advice, repetitive emoji or hashtag patterns, rigid grammar with low entropy, marketing cadence, obvious copypasta.
+ - Emojis: emoji-heavy replies or repeated emojis (e.g., multiple 🙏🔥🚀) are strong bot-leaning signals unless tied to specific, personal context.
 
 Output schema
 {
