@@ -18,6 +18,46 @@ type ScoreResp = {
 const BADGE_CLASS = 'tweet-human-badge';
 const SEEN_ATTR = 'data-human-score-attached';
 
+function parseCountText(text: string): number | null {
+    const t = text.trim().toLowerCase().replace(/,/g, '');
+    if (!t) return null;
+    const m = t.match(/^(\d+(?:\.\d+)?)\s*([km])?$/i);
+    if (!m) return null;
+    const num = parseFloat(m[1]);
+    const suf = (m[2] || '').toLowerCase();
+    if (suf === 'k') return Math.round(num * 1_000);
+    if (suf === 'm') return Math.round(num * 1_000_000);
+    return Math.round(num);
+}
+
+function getTweetLikes(article: HTMLElement): number | null {
+    // Try the like button cluster first
+    const likeCluster = article.querySelector('div[data-testid="like"]');
+    if (likeCluster) {
+        const spans = Array.from(likeCluster.querySelectorAll('span')) as HTMLSpanElement[];
+        for (const s of spans) {
+            const n = parseCountText(s.textContent || '');
+            if (typeof n === 'number') return n;
+        }
+        // Sometimes count is a sibling text
+        const siblingSpans = Array.from((likeCluster.parentElement || article).querySelectorAll('span')) as HTMLSpanElement[];
+        for (const s of siblingSpans) {
+            const n = parseCountText(s.textContent || '');
+            if (typeof n === 'number') return n;
+        }
+    }
+    // Fallback: scan aria-labels mentioning likes
+    const ariaNode = article.querySelector('[aria-label*="like" i]');
+    if (ariaNode) {
+        const m = (ariaNode.getAttribute('aria-label') || '').match(/(\d+[\d,.]*\s*[kKmM]?)/);
+        if (m) {
+            const n = parseCountText(m[1]);
+            if (typeof n === 'number') return n;
+        }
+    }
+    return null;
+}
+
 function getTweetText(article: HTMLElement): string | null {
     const textNode = article.querySelector('div[data-testid="tweetText"]');
     if (textNode) return (textNode as HTMLElement).innerText.trim();
@@ -60,17 +100,27 @@ function applyBadgeBaseStyles(badge: HTMLElement) {
     badge.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
 }
 
-function setBadgeColorByProb(badge: HTMLElement, prob: number) {
-    let bg = '#ca8a04'; // yellow-600
-    if (prob > 0.6) bg = '#16a34a'; // green-600
-    else if (prob < 0.4) bg = '#dc2626'; // red-600
+function setBadgeColorByProbAndConf(badge: HTMLElement, prob: number, conf?: number) {
+    const confidence = typeof conf === 'number' ? conf : 0.5;
+    // Color map suggestion:
+    // ≥ 0.75 and conf ≥ 0.6 → green
+    // 0.45 to 0.75 or conf < 0.6 → yellow
+    // < 0.45 and conf ≥ 0.6 → red
+    let bg = '#ca8a04'; // yellow-600 default
+    if (prob >= 0.75 && confidence >= 0.6) bg = '#16a34a'; // green-600
+    else if (prob < 0.45 && confidence >= 0.6) bg = '#dc2626'; // red-600
     badge.style.backgroundColor = bg;
     badge.style.color = '#fff';
 }
 
-function renderBadge(container: HTMLElement, prob: number) {
+function renderBadge(container: HTMLElement, prob: number, conf?: number) {
     const pct = Math.round(prob * 100);
-    const label = `${pct}%`;
+    const confidence = typeof conf === 'number' ? conf : undefined;
+    const confTxt = confidence !== undefined ? ` (conf ${confidence.toFixed(2)})` : '';
+    // UI calibration: Stop showing “Human 90%” for anything under 0.9 confidence.
+    // Display “Likely human 90% (conf 0.34)” or neutral color when confidence < 0.5.
+    const prefix = prob >= 0.9 && (confidence ?? 0.5) >= 0.9 ? 'Human ' : (prob >= 0.75 ? 'Likely human ' : (prob < 0.45 ? 'Likely bot ' : 'Uncertain '));
+    const label = `${prefix}${pct}%${confTxt}`;
     let badge = container.querySelector<HTMLElement>(`.${BADGE_CLASS}`);
     if (!badge) {
         badge = document.createElement('span');
@@ -78,9 +128,10 @@ function renderBadge(container: HTMLElement, prob: number) {
         container.appendChild(badge);
     }
     applyBadgeBaseStyles(badge);
-    setBadgeColorByProb(badge, prob);
+    setBadgeColorByProbAndConf(badge, prob, confidence);
     badge.textContent = label;
     badge.setAttribute('data-prob', String(prob));
+    if (confidence !== undefined) badge.setAttribute('data-conf', String(confidence));
 }
 
 async function scoreAndBadge(article: HTMLElement) {
@@ -93,9 +144,11 @@ async function scoreAndBadge(article: HTMLElement) {
     const container = ensureBadgeContainer(article);
 
     try {
-        const resp: ScoreResp = await chrome.runtime.sendMessage({ action: 'SCORE_TWEET', text });
+        const likes = getTweetLikes(article) ?? undefined;
+        const resp: ScoreResp = await chrome.runtime.sendMessage({ action: 'SCORE_TWEET', text, likes });
         if (resp?.ok && typeof resp.probability === 'number') {
-            renderBadge(container, resp.probability);
+            const conf = resp.fullResponse?.confidence;
+            renderBadge(container, resp.probability, conf);
         } else {
             // No badge shown on error per requirement
         }
