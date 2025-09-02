@@ -1,4 +1,19 @@
-type ScoreResp = { ok: boolean; probability?: number; error?: string };
+type ScoreResp = { 
+    ok: boolean; 
+    probability?: number; 
+    error?: string; 
+    fullResponse?: {
+        humanProbability?: number;
+        confidence?: number;
+        reasons?: string[];
+        flags?: {
+            shortText?: boolean;
+            genericEngagement?: boolean;
+            echoingOP?: boolean;
+            linkOnlyOrHashtagsOnly?: boolean;
+        };
+    };
+};
 
 const BADGE_CLASS = 'tweet-human-badge';
 const SEEN_ATTR = 'data-human-score-attached';

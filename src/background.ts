@@ -102,11 +102,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                         messages: [
                             {
                                 role: 'system',
-                                content: 'You are a binary classifier. Return strict JSON: {"human_probability": number between 0 and 1}. Consider style, coherence, repetition, phrasing, and context.'
+                                content: `You are a tweet origin classifier. Output one JSON object only.
+
+Goal
+- humanProbability in [0,1], where 0 is certainly bot-like and 1 is certainly human-written.
+
+Strict guidance
+- Short, generic engagement like "Agreed", "Facts", "This is gold, thank you!", "Great thread", "Nice", "Thanks..!!", "gm", or "This is the way" is bot-leaning unless it contains personal specifics or context.
+- Replies that only echo the original post or restate it are bot-leaning.
+- Link-only or hashtag-only replies are bot-leaning.
+- Very short text without concrete detail should have low confidence and usually a low humanProbability.
+- Human signals: concrete first-person details, specific times/places/numbers, mild typos, varied punctuation, context-dependent humor or nuance, code-switching/slang that fits content.
+- Bot signals: templated praise or agreement, recycled advice, repetitive emoji or hashtag patterns, rigid grammar with low entropy, marketing cadence, obvious copypasta.
+
+Output schema
+{
+  "humanProbability": number,
+  "confidence": number,
+  "reasons": string[],
+  "flags": {
+    "shortText": boolean,
+    "genericEngagement": boolean,
+    "echoingOP": boolean,
+    "linkOnlyOrHashtagsOnly": boolean
+  }
+}
+
+Rules
+- JSON only. No markdown or extra text.
+- Keep reasons neutral and concise.`
                             },
                             {
                                 role: 'user',
-                                content: `Tweet:\n"""${text}"""\nReturn only JSON.`
+                                content: `Tweet to classify:\n"""${text}"""`
                             },
                         ],
                         temperature: 0,
@@ -114,17 +142,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
                     const raw = completion.choices?.[0]?.message?.content ?? '{}';
                     let prob = 0.5;
+                    let fullResponse = null;
                     try {
-                        const parsed = JSON.parse(raw as string) as { human_probability?: unknown };
-                        if (typeof parsed?.human_probability === 'number') {
-                            prob = Math.max(0, Math.min(1, parsed.human_probability));
+                        const parsed = JSON.parse(raw as string) as { 
+                            humanProbability?: unknown;
+                            confidence?: unknown;
+                            reasons?: unknown;
+                            flags?: unknown;
+                        };
+                        if (typeof parsed?.humanProbability === 'number') {
+                            prob = Math.max(0, Math.min(1, parsed.humanProbability));
+                            fullResponse = parsed;
                         }
                     } catch {
                         const m = String(raw).match(/([01]?\.\d+|0|1)/);
                         if (m) prob = Math.max(0, Math.min(1, parseFloat(m[1])));
                     }
 
-                    sendResponse({ ok: true, probability: prob });
+                    sendResponse({ ok: true, probability: prob, fullResponse });
                 } catch (e: unknown) {
                     const message = e instanceof Error ? e.message : 'Scoring error';
                     sendResponse({ ok: false, error: message });
