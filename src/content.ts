@@ -100,27 +100,19 @@ function applyBadgeBaseStyles(badge: HTMLElement) {
     badge.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
 }
 
-function setBadgeColorByProbAndConf(badge: HTMLElement, prob: number, conf?: number) {
-    const confidence = typeof conf === 'number' ? conf : 0.5;
-    // Color map suggestion:
-    // ≥ 0.75 and conf ≥ 0.6 → green
-    // 0.45 to 0.75 or conf < 0.6 → yellow
-    // < 0.45 and conf ≥ 0.6 → red
-    let bg = '#ca8a04'; // yellow-600 default
-    if (prob >= 0.75 && confidence >= 0.6) bg = '#16a34a'; // green-600
-    else if (prob < 0.45 && confidence >= 0.6) bg = '#dc2626'; // red-600
+function setBadgeColorByProbAndConf(badge: HTMLElement, prob: number) {
+    // Color map:
+    // < 40% → red, < 60% → yellow, ≥ 60% → green
+    let bg = '#16a34a'; // green-600 default
+    if (prob < 0.4) bg = '#dc2626'; // red-600
+    else if (prob < 0.7) bg = '#ca8a04'; // yellow-600
     badge.style.backgroundColor = bg;
     badge.style.color = '#fff';
 }
 
-function renderBadge(container: HTMLElement, prob: number, conf?: number) {
+function renderBadge(container: HTMLElement, prob: number) {
     const pct = Math.round(prob * 100);
-    const confidence = typeof conf === 'number' ? conf : undefined;
-    const confTxt = confidence !== undefined ? ` (conf ${confidence.toFixed(2)})` : '';
-    // UI calibration: Stop showing “Human 90%” for anything under 0.9 confidence.
-    // Display “Likely human 90% (conf 0.34)” or neutral color when confidence < 0.5.
-    const prefix = prob >= 0.9 && (confidence ?? 0.5) >= 0.9 ? 'Human ' : (prob >= 0.75 ? 'Likely human ' : (prob < 0.45 ? 'Likely bot ' : 'Uncertain '));
-    const label = `${prefix}${pct}%${confTxt}`;
+    const label = `${pct}%`;
     let badge = container.querySelector<HTMLElement>(`.${BADGE_CLASS}`);
     if (!badge) {
         badge = document.createElement('span');
@@ -128,10 +120,9 @@ function renderBadge(container: HTMLElement, prob: number, conf?: number) {
         container.appendChild(badge);
     }
     applyBadgeBaseStyles(badge);
-    setBadgeColorByProbAndConf(badge, prob, confidence);
+    setBadgeColorByProbAndConf(badge, prob);
     badge.textContent = label;
     badge.setAttribute('data-prob', String(prob));
-    if (confidence !== undefined) badge.setAttribute('data-conf', String(confidence));
 }
 
 async function scoreAndBadge(article: HTMLElement) {
@@ -147,8 +138,7 @@ async function scoreAndBadge(article: HTMLElement) {
         const likes = getTweetLikes(article) ?? undefined;
         const resp: ScoreResp = await chrome.runtime.sendMessage({ action: 'SCORE_TWEET', text, likes });
         if (resp?.ok && typeof resp.probability === 'number') {
-            const conf = resp.fullResponse?.confidence;
-            renderBadge(container, resp.probability, conf);
+            renderBadge(container, resp.probability);
         } else {
             // No badge shown on error per requirement
         }
