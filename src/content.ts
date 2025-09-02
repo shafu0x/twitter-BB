@@ -29,30 +29,56 @@ function ensureBadgeContainer(article: HTMLElement): HTMLElement {
     const id = 'tweet-human-badge-container';
     let container = article.querySelector<HTMLElement>(`#${id}`);
     if (!container) {
+        // Ensure the article is a positioning context
+        const computed = window.getComputedStyle(article);
+        if (!computed.position || computed.position === 'static') {
+            article.style.position = 'relative';
+        }
+
         container = document.createElement('div');
         container.id = id;
+        container.style.position = 'absolute';
+        container.style.top = '8px';
+        container.style.right = '8px';
         container.style.display = 'flex';
         container.style.gap = '8px';
-        container.style.marginTop = '4px';
-        const textNode = article.querySelector('div[data-testid="tweetText"]');
-        if (textNode?.parentElement) {
-            textNode.parentElement.appendChild(container);
-        } else {
-            article.appendChild(container);
-        }
+        container.style.pointerEvents = 'none';
+        container.style.zIndex = '10';
+        article.appendChild(container);
     }
     return container;
 }
 
+function applyBadgeBaseStyles(badge: HTMLElement) {
+    badge.style.display = 'inline-flex';
+    badge.style.alignItems = 'center';
+    badge.style.padding = '2px 8px';
+    badge.style.borderRadius = '9999px';
+    badge.style.fontSize = '12px';
+    badge.style.fontWeight = '600';
+    badge.style.lineHeight = '1';
+    badge.style.fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+}
+
+function setBadgeColorByProb(badge: HTMLElement, prob: number) {
+    let bg = '#ca8a04'; // yellow-600
+    if (prob > 0.6) bg = '#16a34a'; // green-600
+    else if (prob < 0.4) bg = '#dc2626'; // red-600
+    badge.style.backgroundColor = bg;
+    badge.style.color = '#fff';
+}
+
 function renderBadge(container: HTMLElement, prob: number) {
     const pct = Math.round(prob * 100);
-    const label = `Human ${pct}%`;
+    const label = `${pct}%`;
     let badge = container.querySelector<HTMLElement>(`.${BADGE_CLASS}`);
     if (!badge) {
         badge = document.createElement('span');
         badge.className = BADGE_CLASS;
         container.appendChild(badge);
     }
+    applyBadgeBaseStyles(badge);
+    setBadgeColorByProb(badge, prob);
     badge.textContent = label;
     badge.setAttribute('data-prob', String(prob));
 }
@@ -65,17 +91,16 @@ async function scoreAndBadge(article: HTMLElement) {
     if (!text || text.length < 5) return;
 
     const container = ensureBadgeContainer(article);
-    renderBadge(container, 0.5);
 
     try {
         const resp: ScoreResp = await chrome.runtime.sendMessage({ action: 'SCORE_TWEET', text });
         if (resp?.ok && typeof resp.probability === 'number') {
             renderBadge(container, resp.probability);
         } else {
-            renderBadge(container, 0.5);
+            // No badge shown on error per requirement
         }
     } catch {
-        renderBadge(container, 0.5);
+        // No badge shown on error per requirement
     }
 }
 

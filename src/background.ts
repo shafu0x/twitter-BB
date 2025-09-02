@@ -97,8 +97,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                     });
 
                     const completion = await client.chat.completions.create({
-                        model: 'gpt-4o-mini',
-                        response_format: { type: 'json_object' },
+                        model: 'gpt-4',
                         messages: [
                             {
                                 role: 'system',
@@ -129,7 +128,8 @@ Output schema
 }
 
 Rules
-- JSON only. No markdown or extra text.
+- Output ONLY valid JSON. No markdown, no backticks, no extra text before or after.
+- Start your response with { and end with }
 - Keep reasons neutral and concise.`
                             },
                             {
